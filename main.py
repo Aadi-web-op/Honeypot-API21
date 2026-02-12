@@ -8,7 +8,7 @@ from typing import List, Optional, Dict
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, UploadFile, File
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from dotenv import load_dotenv
 
 # Import our custom modules
@@ -16,7 +16,15 @@ from key_manager import KeyManager
 from persona_manager import PersonaManager
 from media_handler import MediaHandler
 from utils.fake_proof import FakeProofGenerator
-from presidio_analyzer import AnalyzerEngine, RecognizerResult
+try:
+    from presidio_analyzer import AnalyzerEngine, RecognizerResult
+except Exception as e:
+    AnalyzerEngine = None
+    RecognizerResult = None
+    # Use print or existing logger if defined, but logger is defined later. 
+    # Safest to just set to None and log later or ignore for import time.
+    # We will log it after logging config is set up if possible, or just print it.
+    print(f"Warning: Presidio Analyzer could not be imported. Error: {e}")
 
 # Load environment variables
 load_dotenv()
@@ -70,6 +78,15 @@ class ChatRequest(BaseModel):
     message: str
     sender: str = "scammer"  # scammer or user
 
+    @validator('message')
+    def validate_message(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Message cannot be empty')
+        if len(v) > 2000: # Limit to 2000 chars to prevent DoS
+             raise ValueError('Message too long (max 2000 characters)')
+        return v
+
+
 # -- Helper Functions --
 
 def redact_pii(text: str) -> str:
@@ -116,7 +133,23 @@ async def chat_endpoint(request: ChatRequest):
     session_id = request.session_id
     user_msg = request.message
     
+    # -- SECURITY: Heuristic Injection Detection --
+    # If the user tries to break the model, we neutralize the message before the LLM sees it.
+    low_msg = user_msg.lower()
+    injection_triggers = [
+        "ignore all previous", 
+        "system prompt", 
+        "ignore instructions", 
+        "reveal your", 
+        "your instructions"
+    ]
+    if any(trigger in low_msg for trigger in injection_triggers):
+        logger.warning(f"🛡️ Injection Blocked: {user_msg}")
+        # Replace the dangerous prompt with something that naturally elicits a confused response
+        user_msg = "beta what is this code? i dont understand computer language."
+    
     # Initialize session if new
+
     if session_id not in sessions:
         persona = persona_manager.select_persona(user_msg)
         sessions[session_id] = {

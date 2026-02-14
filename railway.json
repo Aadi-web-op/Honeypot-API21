@@ -1,23 +1,8 @@
 {
   "build": {
-    "builder": "NIXPACKS",
-    "nixpacksPlan": {
-      "phases": {
-        "setup": {
-          "nixPkgs": [
-            "tesseract"
-          ]
-        },
-        "install": {
-          "cmds": [
-            "python -m pip install -r requirements.txt",
-            "python -m spacy download en_core_web_lg"
-          ]
-        }
-      }
-    }
+    "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    "startCommand": "uvicorn main:app --host 0.0.0.0 --port 8080 --proxy-headers"
   }
 }

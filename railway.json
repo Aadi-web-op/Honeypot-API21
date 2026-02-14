@@ -5,9 +5,7 @@
       "phases": {
         "setup": {
           "nixPkgs": [
-            "tesseract",
-            "python311",
-            "python311Packages.pip"
+            "tesseract"
           ]
         },
         "install": {

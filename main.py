@@ -107,6 +107,7 @@ def redact_pii(text: str) -> str:
     except Exception as e:
         logger.error(f"Redaction failed: {e}")
         return text
+        
 
 def extract_upi(text: str) -> Optional[str]:
     """Tries to find a UPI ID in the text."""
